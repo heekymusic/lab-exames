@@ -3,7 +3,7 @@ const { Pool } = require("pg");
 
 const app = express();
 
-const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -30,7 +30,8 @@ app.get("/db", async (req, res) => {
 
     res.status(500).json({
       sucesso: false,
-      mensagem: "Erro ao conectar ao PostgreSQL"
+      mensagem: "Erro ao conectar ao PostgreSQL",
+      erro: error.message
     });
   }
 });
