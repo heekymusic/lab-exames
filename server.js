@@ -1,11 +1,19 @@
 const express = require("express");
 const multer = require("multer");
 const { Pool } = require("pg");
+
 const { parseTXT } = require("./parser");
+
+const {
+  buscarPacientes,
+  buscarPedidosPorPaciente,
+  buscarPedido
+} = require("./consultas");
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
 
 // ========================================
 // POSTGRESQL
@@ -13,16 +21,19 @@ const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
   ssl: process.env.NODE_ENV === "production"
     ? { rejectUnauthorized: false }
     : false
 });
+
 
 // ========================================
 // UPLOAD
 // ========================================
 
 const upload = multer({
+
   storage: multer.memoryStorage(),
 
   limits: {
@@ -30,15 +41,26 @@ const upload = multer({
   },
 
   fileFilter: (req, file, cb) => {
-    const nome = file.originalname.toLowerCase();
+
+    const nome =
+      file.originalname.toLowerCase();
 
     if (!nome.endsWith(".txt")) {
-      return cb(new Error("Apenas arquivos TXT são permitidos."));
+
+      return cb(
+        new Error(
+          "Apenas arquivos TXT são permitidos."
+        )
+      );
+
     }
 
     cb(null, true);
+
   }
+
 });
+
 
 // ========================================
 // MIDDLEWARE
@@ -46,421 +68,1662 @@ const upload = multer({
 
 app.use(express.json());
 
+
 // ========================================
 // PÁGINA INICIAL
 // ========================================
 
 app.get("/", (req, res) => {
+
   res.send(`
-    <!DOCTYPE html>
-    <html lang="pt-BR">
+<!DOCTYPE html>
 
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="pt-BR">
 
-      <title>Laboratorio Maiolini e Miranda</title>
+<head>
 
-      <style>
-        * {
-          box-sizing: border-box;
-        }
+<meta charset="UTF-8">
 
-        body {
-          margin: 0;
-          font-family: Arial, Helvetica, sans-serif;
-          background: #f4f6f8;
-          color: #222;
-        }
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
 
-        .container {
-          max-width: 900px;
-          margin: 80px auto;
-          padding: 20px;
-        }
+<title>
+Laboratorio Maiolini e Miranda
+</title>
 
-        .card {
-          background: white;
-          border-radius: 14px;
-          padding: 40px;
-          box-shadow: 0 5px 25px rgba(0,0,0,0.08);
-        }
+<style>
 
-        h1 {
-          margin-top: 0;
-        }
+* {
+  box-sizing: border-box;
+}
 
-        p {
-          color: #666;
-        }
+body {
 
-        .links {
-          display: flex;
-          gap: 15px;
-          margin-top: 30px;
-          flex-wrap: wrap;
-        }
+  margin: 0;
 
-        a {
-          display: inline-block;
-          padding: 14px 22px;
-          border-radius: 8px;
-          text-decoration: none;
-          background: #2563eb;
-          color: white;
-        }
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 
-        a:hover {
-          background: #1d4ed8;
-        }
-      </style>
-    </head>
+  background: #f4f6f8;
 
-    <body>
+  color: #1f2937;
 
-      <div class="container">
+}
 
-        <div class="card">
+.container {
 
-          <h1>
-            Laboratorio Maiolini e Miranda
-          </h1>
+  max-width: 1000px;
 
-          <p>
-            Portal de exames laboratoriais
-          </p>
+  margin: 50px auto;
 
-          <div class="links">
+  padding: 20px;
 
-            <a href="/importar">
-              Importar exames
-            </a>
+}
 
-            <a href="/db">
-              Testar banco de dados
-            </a>
+.header {
+
+  background: white;
+
+  padding: 30px;
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 5px 25px
+    rgba(0,0,0,0.08);
+
+  margin-bottom: 25px;
+
+}
+
+.header h1 {
+
+  margin: 0 0 8px 0;
+
+  font-size: 28px;
+
+}
+
+.header p {
+
+  margin: 0;
+
+  color: #6b7280;
+
+}
+
+.card {
+
+  background: white;
+
+  padding: 30px;
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 5px 25px
+    rgba(0,0,0,0.08);
+
+}
+
+.busca {
+
+  display: flex;
+
+  gap: 10px;
+
+  margin-top: 20px;
+
+}
+
+.busca input {
+
+  flex: 1;
+
+  padding: 14px;
+
+  border: 1px solid #d1d5db;
+
+  border-radius: 8px;
+
+  font-size: 16px;
+
+}
+
+button {
+
+  border: none;
+
+  border-radius: 8px;
+
+  padding: 14px 22px;
+
+  background: #2563eb;
+
+  color: white;
+
+  font-weight: bold;
+
+  cursor: pointer;
+
+}
+
+button:hover {
+
+  background: #1d4ed8;
+
+}
+
+.resultado {
+
+  margin-top: 25px;
+
+}
+
+.paciente {
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 10px;
+
+  padding: 20px;
+
+  margin-bottom: 12px;
+
+  cursor: pointer;
+
+  transition: 0.15s;
+
+}
+
+.paciente:hover {
+
+  background: #f8fafc;
+
+  border-color: #2563eb;
+
+}
+
+.paciente-nome {
+
+  font-size: 18px;
+
+  font-weight: bold;
+
+  margin-bottom: 7px;
+
+}
+
+.paciente-info {
+
+  color: #6b7280;
+
+  font-size: 14px;
+
+}
+
+.vazio {
+
+  padding: 25px;
+
+  text-align: center;
+
+  color: #6b7280;
+
+}
+
+.loading {
+
+  padding: 25px;
+
+  text-align: center;
+
+}
+
+.acoes {
+
+  margin-top: 20px;
+
+}
+
+.secundario {
+
+  background: #6b7280;
+
+}
+
+.secundario:hover {
+
+  background: #4b5563;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+
+  <div class="header">
+
+    <h1>
+      Laboratorio Maiolini e Miranda
+    </h1>
+
+    <p>
+      Portal de exames laboratoriais
+    </p>
+
+  </div>
+
+
+  <div class="card">
+
+    <h2>
+      Buscar paciente
+    </h2>
+
+    <p>
+      Digite o nome do paciente ou código.
+    </p>
+
+
+    <div class="busca">
+
+      <input
+        id="termo"
+        type="text"
+        placeholder="Nome ou código do paciente"
+        autocomplete="off"
+      >
+
+      <button
+        onclick="buscar()"
+      >
+        BUSCAR
+      </button>
+
+    </div>
+
+
+    <div
+      id="resultado"
+      class="resultado"
+    ></div>
+
+
+  </div>
+
+
+</div>
+
+
+<script>
+
+
+const campo =
+  document.getElementById("termo");
+
+
+const resultado =
+  document.getElementById("resultado");
+
+
+// ======================================
+// ENTER PARA BUSCAR
+// ======================================
+
+campo.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (event.key === "Enter") {
+
+      buscar();
+
+    }
+
+  }
+);
+
+
+// ======================================
+// BUSCAR PACIENTES
+// ======================================
+
+async function buscar() {
+
+  const termo =
+    campo.value.trim();
+
+
+  if (!termo) {
+
+    resultado.innerHTML = `
+      <div class="vazio">
+        Digite o nome ou código do paciente.
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  resultado.innerHTML = `
+    <div class="loading">
+      Buscando...
+    </div>
+  `;
+
+
+  try {
+
+    const resposta =
+      await fetch(
+        "/api/pacientes?termo=" +
+        encodeURIComponent(termo)
+      );
+
+
+    const dados =
+      await resposta.json();
+
+
+    if (!dados.sucesso) {
+
+      throw new Error(
+        dados.mensagem ||
+        "Erro ao buscar pacientes."
+      );
+
+    }
+
+
+    if (
+      dados.pacientes.length === 0
+    ) {
+
+      resultado.innerHTML = `
+        <div class="vazio">
+          Nenhum paciente encontrado.
+        </div>
+      `;
+
+      return;
+
+    }
+
+
+    resultado.innerHTML =
+      dados.pacientes
+        .map(paciente => `
+
+          <div
+            class="paciente"
+            onclick="abrirPaciente(${paciente.id})"
+          >
+
+            <div class="paciente-nome">
+              ${escapar(paciente.nome)}
+            </div>
+
+            <div class="paciente-info">
+
+              Código:
+              ${escapar(
+                paciente.codigo_externo || "-"
+              )}
+
+              &nbsp; • &nbsp;
+
+              ${paciente.quantidade_pedidos}
+              pedido(s)
+
+            </div>
 
           </div>
+
+        `)
+        .join("");
+
+
+  } catch (erro) {
+
+    resultado.innerHTML = `
+
+      <div class="vazio">
+
+        Erro:
+        ${escapar(erro.message)}
+
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+// ======================================
+// ABRIR PACIENTE
+// ======================================
+
+async function abrirPaciente(
+  pacienteId
+) {
+
+  resultado.innerHTML = `
+
+    <div class="loading">
+      Carregando pedidos...
+    </div>
+
+  `;
+
+
+  try {
+
+    const resposta =
+      await fetch(
+        "/api/pacientes/" +
+        pacienteId +
+        "/pedidos"
+      );
+
+
+    const dados =
+      await resposta.json();
+
+
+    if (!dados.sucesso) {
+
+      throw new Error(
+        dados.mensagem
+      );
+
+    }
+
+
+    let html = `
+
+      <div>
+
+        <h2>
+          Pedidos do paciente
+        </h2>
+
+    `;
+
+
+    if (
+      dados.pedidos.length === 0
+    ) {
+
+      html += `
+
+        <div class="vazio">
+          Nenhum pedido encontrado.
+        </div>
+
+      `;
+
+    } else {
+
+      dados.pedidos.forEach(
+        pedido => {
+
+          html += `
+
+            <div
+              class="paciente"
+              onclick="abrirPedido(${pedido.id})"
+            >
+
+              <div class="paciente-nome">
+
+                Pedido:
+                ${escapar(
+                  pedido.numero_pedido
+                )}
+
+              </div>
+
+              <div class="paciente-info">
+
+                Coleta:
+                ${formatarData(
+                  pedido.data_coleta
+                )}
+
+                &nbsp; • &nbsp;
+
+                ${pedido.quantidade_exames}
+                exame(s)
+
+              </div>
+
+            </div>
+
+          `;
+
+        }
+      );
+
+    }
+
+
+    html += `
+
+        <div class="acoes">
+
+          <button
+            class="secundario"
+            onclick="buscar()"
+          >
+            ← VOLTAR
+          </button>
 
         </div>
 
       </div>
 
-    </body>
+    `;
 
-    </html>
+
+    resultado.innerHTML = html;
+
+
+  } catch (erro) {
+
+    resultado.innerHTML = `
+
+      <div class="vazio">
+
+        Erro:
+        ${escapar(erro.message)}
+
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+// ======================================
+// ABRIR PEDIDO
+// ======================================
+
+async function abrirPedido(
+  pedidoId
+) {
+
+  resultado.innerHTML = `
+
+    <div class="loading">
+      Carregando exames...
+    </div>
+
+  `;
+
+
+  try {
+
+    const resposta =
+      await fetch(
+        "/api/pedidos/" +
+        pedidoId
+      );
+
+
+    const dados =
+      await resposta.json();
+
+
+    if (!dados.sucesso) {
+
+      throw new Error(
+        dados.mensagem
+      );
+
+    }
+
+
+    const pedido =
+      dados.pedido;
+
+
+    let html = `
+
+      <div>
+
+        <h2>
+          ${escapar(
+            pedido.paciente_nome
+          )}
+        </h2>
+
+        <p>
+          <strong>
+            Pedido:
+          </strong>
+
+          ${escapar(
+            pedido.numero_pedido
+          )}
+        </p>
+
+        <p>
+          <strong>
+            Data da coleta:
+          </strong>
+
+          ${formatarData(
+            pedido.data_coleta
+          )}
+        </p>
+
+        <hr>
+
+    `;
+
+
+    if (
+      pedido.exames.length === 0
+    ) {
+
+      html += `
+
+        <div class="vazio">
+          Nenhum exame encontrado.
+        </div>
+
+      `;
+
+    }
+
+
+    pedido.exames.forEach(
+      exame => {
+
+        html += `
+
+          <div
+            class="paciente"
+            style="cursor:default"
+          >
+
+            <div class="paciente-nome">
+
+              ${escapar(
+                exame.nome
+              )}
+
+            </div>
+
+        `;
+
+
+        if (exame.material) {
+
+          html += `
+
+            <div class="paciente-info">
+
+              Material:
+              ${escapar(
+                exame.material
+              )}
+
+            </div>
+
+          `;
+
+        }
+
+
+        if (exame.metodo) {
+
+          html += `
+
+            <div class="paciente-info">
+
+              Método:
+              ${escapar(
+                exame.metodo
+              )}
+
+            </div>
+
+          `;
+
+        }
+
+
+        // =================================
+        // EXAME COM ITENS
+        // =================================
+
+        if (
+          exame.itens &&
+          exame.itens.length > 0
+        ) {
+
+          html += `
+
+            <div
+              style="
+                margin-top:15px;
+                overflow-x:auto;
+              "
+            >
+
+              <table
+                style="
+                  width:100%;
+                  border-collapse:collapse;
+                "
+              >
+
+                <thead>
+
+                  <tr>
+
+                    <th
+                      style="
+                        text-align:left;
+                        padding:10px;
+                        border-bottom:1px solid #ddd;
+                      "
+                    >
+                      Exame
+                    </th>
+
+                    <th
+                      style="
+                        text-align:left;
+                        padding:10px;
+                        border-bottom:1px solid #ddd;
+                      "
+                    >
+                      Resultado
+                    </th>
+
+                    <th
+                      style="
+                        text-align:left;
+                        padding:10px;
+                        border-bottom:1px solid #ddd;
+                      "
+                    >
+                      Referência
+                    </th>
+
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+          `;
+
+
+          exame.itens.forEach(
+            item => {
+
+              html += `
+
+                <tr>
+
+                  <td
+                    style="
+                      padding:10px;
+                      border-bottom:1px solid #eee;
+                    "
+                  >
+                    ${escapar(
+                      item.nome
+                    )}
+                  </td>
+
+                  <td
+                    style="
+                      padding:10px;
+                      border-bottom:1px solid #eee;
+                      font-weight:bold;
+                    "
+                  >
+                    ${escapar(
+                      item.resultado || "-"
+                    )}
+                  </td>
+
+                  <td
+                    style="
+                      padding:10px;
+                      border-bottom:1px solid #eee;
+                    "
+                  >
+                    ${escapar(
+                      item.referencia || "-"
+                    )}
+                  </td>
+
+                </tr>
+
+              `;
+
+            }
+          );
+
+
+          html += `
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          `;
+
+        } else {
+
+          // =================================
+          // EXAME SIMPLES
+          // =================================
+
+          if (
+            exame.resultado_texto
+          ) {
+
+            html += `
+
+              <div
+                style="
+                  margin-top:15px;
+                  padding:15px;
+                  background:#f8fafc;
+                  border-radius:8px;
+                "
+              >
+
+                <strong>
+                  Resultado:
+                </strong>
+
+                ${escapar(
+                  exame.resultado_texto
+                )}
+
+              </div>
+
+            `;
+
+          }
+
+
+          if (
+            exame.referencia_texto
+          ) {
+
+            html += `
+
+              <div
+                style="
+                  margin-top:10px;
+                  color:#6b7280;
+                "
+              >
+
+                <strong>
+                  Referência:
+                </strong>
+
+                ${escapar(
+                  exame.referencia_texto
+                )}
+
+              </div>
+
+            `;
+
+          }
+
+        }
+
+
+        if (
+          exame.observacoes
+        ) {
+
+          html += `
+
+            <div
+              style="
+                margin-top:15px;
+                color:#6b7280;
+              "
+            >
+
+              <strong>
+                Observações:
+              </strong>
+
+              <br>
+
+              ${escapar(
+                exame.observacoes
+              )}
+
+            </div>
+
+          `;
+
+        }
+
+
+        html += `
+
+          </div>
+
+        `;
+
+      }
+    );
+
+
+    html += `
+
+        <div class="acoes">
+
+          <button
+            class="secundario"
+            onclick="buscar()"
+          >
+            ← NOVA BUSCA
+          </button>
+
+        </div>
+
+      </div>
+
+    `;
+
+
+    resultado.innerHTML = html;
+
+
+  } catch (erro) {
+
+    resultado.innerHTML = `
+
+      <div class="vazio">
+
+        Erro:
+        ${escapar(erro.message)}
+
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+// ======================================
+// FORMATAR DATA
+// ======================================
+
+function formatarData(data) {
+
+  if (!data) {
+
+    return "-";
+
+  }
+
+
+  const partes =
+    String(data)
+      .substring(0, 10)
+      .split("-");
+
+
+  if (partes.length !== 3) {
+
+    return data;
+
+  }
+
+
+  return (
+    partes[2] +
+    "/" +
+    partes[1] +
+    "/" +
+    partes[0]
+  );
+
+}
+
+
+// ======================================
+// ESCAPAR HTML
+// ======================================
+
+function escapar(valor) {
+
+  if (
+    valor === null ||
+    valor === undefined
+  ) {
+
+    return "";
+
+  }
+
+
+  return String(valor)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+</script>
+
+
+</body>
+
+</html>
   `);
+
 });
 
+
 // ========================================
-// TESTE DO POSTGRESQL
+// TESTE DO BANCO
 // ========================================
 
 app.get("/db", async (req, res) => {
 
   try {
 
-    const result = await pool.query(`
-      SELECT
-        NOW() AS horario,
-        current_database() AS banco
-    `);
+    const result =
+      await pool.query(`
+        SELECT
+          NOW() AS horario,
+          current_database() AS banco
+      `);
+
 
     res.json({
+
       sucesso: true,
-      mensagem: "PostgreSQL conectado com sucesso!",
-      horario: result.rows[0].horario,
-      banco: result.rows[0].banco
+
+      mensagem:
+        "PostgreSQL conectado com sucesso!",
+
+      horario:
+        result.rows[0].horario,
+
+      banco:
+        result.rows[0].banco
+
     });
+
 
   } catch (error) {
 
-    console.error("Erro PostgreSQL:", error);
+    console.error(
+      "Erro PostgreSQL:",
+      error
+    );
+
 
     res.status(500).json({
+
       sucesso: false,
-      mensagem: "Erro ao conectar ao PostgreSQL",
-      erro: error.message
+
+      mensagem:
+        "Erro ao conectar ao PostgreSQL",
+
+      erro:
+        error.message
+
     });
 
   }
 
 });
 
+
+// ========================================
+// API - BUSCAR PACIENTES
+// ========================================
+
+app.get(
+  "/api/pacientes",
+  async (req, res) => {
+
+    try {
+
+      const termo =
+        String(
+          req.query.termo || ""
+        ).trim();
+
+
+      if (!termo) {
+
+        return res.status(400).json({
+
+          sucesso: false,
+
+          mensagem:
+            "Informe um nome ou código."
+
+        });
+
+      }
+
+
+      const pacientes =
+        await buscarPacientes(
+          termo
+        );
+
+
+      res.json({
+
+        sucesso: true,
+
+        pacientes
+
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao buscar pacientes:",
+        error
+      );
+
+
+      res.status(500).json({
+
+        sucesso: false,
+
+        mensagem:
+          "Erro ao buscar pacientes.",
+
+        erro:
+          error.message
+
+      });
+
+    }
+
+  }
+);
+
+
+// ========================================
+// API - PEDIDOS DO PACIENTE
+// ========================================
+
+app.get(
+  "/api/pacientes/:id/pedidos",
+  async (req, res) => {
+
+    try {
+
+      const pacienteId =
+        Number(
+          req.params.id
+        );
+
+
+      if (
+        !Number.isInteger(
+          pacienteId
+        )
+      ) {
+
+        return res.status(400).json({
+
+          sucesso: false,
+
+          mensagem:
+            "ID do paciente inválido."
+
+        });
+
+      }
+
+
+      const pedidos =
+        await buscarPedidosPorPaciente(
+          pacienteId
+        );
+
+
+      res.json({
+
+        sucesso: true,
+
+        pedidos
+
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao buscar pedidos:",
+        error
+      );
+
+
+      res.status(500).json({
+
+        sucesso: false,
+
+        mensagem:
+          "Erro ao buscar pedidos.",
+
+        erro:
+          error.message
+
+      });
+
+    }
+
+  }
+);
+
+
+// ========================================
+// API - PEDIDO COMPLETO
+// ========================================
+
+app.get(
+  "/api/pedidos/:id",
+  async (req, res) => {
+
+    try {
+
+      const pedidoId =
+        Number(
+          req.params.id
+        );
+
+
+      if (
+        !Number.isInteger(
+          pedidoId
+        )
+      ) {
+
+        return res.status(400).json({
+
+          sucesso: false,
+
+          mensagem:
+            "ID do pedido inválido."
+
+        });
+
+      }
+
+
+      const pedido =
+        await buscarPedido(
+          pedidoId
+        );
+
+
+      if (!pedido) {
+
+        return res.status(404).json({
+
+          sucesso: false,
+
+          mensagem:
+            "Pedido não encontrado."
+
+        });
+
+      }
+
+
+      res.json({
+
+        sucesso: true,
+
+        pedido
+
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao buscar pedido:",
+        error
+      );
+
+
+      res.status(500).json({
+
+        sucesso: false,
+
+        mensagem:
+          "Erro ao buscar pedido.",
+
+        erro:
+          error.message
+
+      });
+
+    }
+
+  }
+);
+
+
 // ========================================
 // TELA DE IMPORTAÇÃO
 // ========================================
 
-app.get("/importar", (req, res) => {
-
-  res.send(`
-    <!DOCTYPE html>
-
-    <html lang="pt-BR">
-
-    <head>
-
-      <meta charset="UTF-8">
-
-      <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-      >
-
-      <title>Importar exames</title>
-
-      <style>
-
-        * {
-          box-sizing: border-box;
-        }
-
-        body {
-          margin: 0;
-          font-family: Arial, Helvetica, sans-serif;
-          background: #f4f6f8;
-          color: #222;
-        }
-
-        .container {
-          max-width: 650px;
-          margin: 60px auto;
-          padding: 20px;
-        }
-
-        .card {
-          background: white;
-          border-radius: 14px;
-          padding: 35px;
-          box-shadow: 0 5px 25px rgba(0,0,0,0.08);
-        }
-
-        h1 {
-          margin-top: 0;
-        }
-
-        .subtitulo {
-          color: #666;
-          margin-bottom: 30px;
-        }
-
-        .campo {
-          margin-bottom: 25px;
-        }
-
-        label {
-          display: block;
-          font-weight: bold;
-          margin-bottom: 10px;
-        }
-
-        input[type="file"] {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          background: white;
-        }
-
-        button {
-          width: 100%;
-          padding: 15px;
-          border: none;
-          border-radius: 8px;
-          background: #2563eb;
-          color: white;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-        }
-
-        button:hover {
-          background: #1d4ed8;
-        }
+app.get(
+  "/importar",
+  (req, res) => {
 
-        button:disabled {
-          background: #999;
-          cursor: wait;
-        }
+    res.send(`
 
-        #resultado {
-          margin-top: 25px;
-          padding: 20px;
-          border-radius: 8px;
-          background: #f1f5f9;
-          white-space: pre-wrap;
-          word-break: break-word;
-          display: none;
-        }
+<!DOCTYPE html>
 
-        .voltar {
-          display: inline-block;
-          margin-top: 20px;
-          color: #2563eb;
-          text-decoration: none;
-        }
+<html lang="pt-BR">
 
-      </style>
+<head>
 
-    </head>
+<meta charset="UTF-8">
 
-    <body>
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
 
-      <div class="container">
+<title>
+Importar exames
+</title>
 
-        <div class="card">
+<style>
 
-          <h1>
-            Importar exames
-          </h1>
+body {
 
-          <div class="subtitulo">
-            Laboratorio Maiolini e Miranda
-          </div>
+  margin:0;
 
-          <form id="formulario">
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 
-            <div class="campo">
+  background:#f4f6f8;
 
-              <label for="arquivo">
-                Arquivo TXT dos exames
-              </label>
+}
 
-              <input
-                id="arquivo"
-                type="file"
-                name="arquivo"
-                accept=".txt"
-                required
-              >
+.container {
 
-            </div>
+  max-width:650px;
 
-            <button
-              id="botao"
-              type="submit"
-            >
-              IMPORTAR EXAMES
-            </button>
+  margin:60px auto;
 
-          </form>
+  padding:20px;
 
-          <div id="resultado"></div>
+}
 
-          <a
-            class="voltar"
-            href="/"
-          >
-            ← Voltar
-          </a>
+.card {
 
-        </div>
+  background:white;
 
-      </div>
+  padding:35px;
 
-      <script>
+  border-radius:14px;
 
-        const formulario =
-          document.getElementById("formulario");
+  box-shadow:
+    0 5px 25px
+    rgba(0,0,0,0.08);
 
-        const botao =
-          document.getElementById("botao");
+}
 
-        const resultado =
-          document.getElementById("resultado");
+h1 {
 
+  margin-top:0;
 
-        formulario.addEventListener(
-          "submit",
-          async function(event) {
+}
 
-            event.preventDefault();
+input {
 
-            const arquivo =
-              document.getElementById("arquivo").files[0];
+  width:100%;
 
-            if (!arquivo) {
+  padding:12px;
 
-              alert("Selecione um arquivo TXT.");
+  margin:
+    15px 0 25px;
 
-              return;
+  border:
+    1px solid #ccc;
 
-            }
+  border-radius:8px;
 
+}
 
-            botao.disabled = true;
+button {
 
-            botao.textContent =
-              "IMPORTANDO...";
+  width:100%;
 
-            resultado.style.display = "block";
+  padding:15px;
 
-            resultado.textContent =
-              "Processando arquivo, aguarde...";
+  border:none;
 
+  border-radius:8px;
 
-            try {
+  background:#2563eb;
 
-              const dados =
-                new FormData();
+  color:white;
 
-              dados.append(
-                "arquivo",
-                arquivo
-              );
+  font-weight:bold;
 
+  cursor:pointer;
 
-              const resposta =
-                await fetch(
-                  "/importar",
-                  {
-                    method: "POST",
-                    body: dados
-                  }
-                );
+}
 
+#resultado {
 
-              const json =
-                await resposta.json();
+  margin-top:20px;
 
+  padding:15px;
 
-              resultado.textContent =
-                JSON.stringify(
-                  json,
-                  null,
-                  2
-                );
+  background:#f1f5f9;
 
+  border-radius:8px;
 
-            } catch (erro) {
+  white-space:pre-wrap;
 
-              resultado.textContent =
-                "Erro de comunicação: " +
-                erro.message;
+}
 
-            }
+</style>
 
+</head>
 
-            botao.disabled = false;
+<body>
 
-            botao.textContent =
-              "IMPORTAR EXAMES";
 
+<div class="container">
+
+<div class="card">
+
+<h1>
+Importar exames
+</h1>
+
+<p>
+Laboratorio Maiolini e Miranda
+</p>
+
+
+<form id="formulario">
+
+<input
+  id="arquivo"
+  type="file"
+  name="arquivo"
+  accept=".txt"
+  required
+>
+
+
+<button
+  type="submit"
+>
+IMPORTAR EXAMES
+</button>
+
+</form>
+
+
+<div
+  id="resultado"
+  style="display:none"
+></div>
+
+
+</div>
+
+</div>
+
+
+<script>
+
+const formulario =
+  document.getElementById(
+    "formulario"
+  );
+
+
+const resultado =
+  document.getElementById(
+    "resultado"
+  );
+
+
+formulario.addEventListener(
+  "submit",
+  async function(event) {
+
+    event.preventDefault();
+
+
+    const arquivo =
+      document.getElementById(
+        "arquivo"
+      ).files[0];
+
+
+    if (!arquivo) {
+
+      return;
+
+    }
+
+
+    const dados =
+      new FormData();
+
+
+    dados.append(
+      "arquivo",
+      arquivo
+    );
+
+
+    resultado.style.display =
+      "block";
+
+
+    resultado.textContent =
+      "Importando...";
+
+
+    try {
+
+      const resposta =
+        await fetch(
+          "/importar",
+          {
+            method:"POST",
+            body:dados
           }
-
         );
 
-      </script>
 
-    </body>
+      const json =
+        await resposta.json();
 
-    </html>
-  `);
 
-});
+      resultado.textContent =
+        JSON.stringify(
+          json,
+          null,
+          2
+        );
+
+
+    } catch(error) {
+
+      resultado.textContent =
+        "Erro: " +
+        error.message;
+
+    }
+
+  }
+);
+
+</script>
+
+
+</body>
+
+</html>
+
+    `);
+
+  }
+);
+
 
 // ========================================
-// IMPORTAÇÃO DO TXT
+// IMPORTAR TXT
 // ========================================
 
 app.post(
@@ -471,8 +1734,12 @@ app.post(
     if (!req.file) {
 
       return res.status(400).json({
-        sucesso: false,
-        mensagem: "Nenhum arquivo TXT foi enviado."
+
+        sucesso:false,
+
+        mensagem:
+          "Nenhum arquivo TXT foi enviado."
+
       });
 
     }
@@ -483,67 +1750,69 @@ app.post(
 
     try {
 
-      // ------------------------------------
-      // LER ARQUIVO
-      // ------------------------------------
-
       const conteudo =
-        req.file.buffer.toString("utf8");
+        req.file.buffer.toString(
+          "utf8"
+        );
 
-
-      // ------------------------------------
-      // PROCESSAR TXT
-      // ------------------------------------
 
       const pedidos =
-        parseTXT(conteudo);
+        parseTXT(
+          conteudo
+        );
 
 
-      if (!pedidos || pedidos.length === 0) {
+      if (
+        !pedidos ||
+        pedidos.length === 0
+      ) {
 
         return res.status(400).json({
-          sucesso: false,
+
+          sucesso:false,
+
           mensagem:
             "Nenhum pedido foi encontrado no arquivo."
+
         });
 
       }
 
 
-      // ------------------------------------
-      // CONEXÃO
-      // ------------------------------------
-
       client =
         await pool.connect();
 
 
-      await client.query("BEGIN");
+      await client.query(
+        "BEGIN"
+      );
 
 
       let pacientesInseridos = 0;
+
       let pacientesExistentes = 0;
 
       let pedidosInseridos = 0;
+
       let pedidosExistentes = 0;
 
       let examesInseridos = 0;
+
       let itensInseridos = 0;
 
 
-      // ------------------------------------
-      // PROCESSAR PEDIDOS
-      // ------------------------------------
-
-      for (const pedidoData of pedidos) {
+      for (
+        const pedidoData
+        of pedidos
+      ) {
 
         const paciente =
           pedidoData.paciente;
 
 
-        // ----------------------------------
+        // ==================================
         // PACIENTE
-        // ----------------------------------
+        // ==================================
 
         let pacienteId;
 
@@ -598,9 +1867,9 @@ app.post(
         }
 
 
-        // ----------------------------------
+        // ==================================
         // PEDIDO
-        // ----------------------------------
+        // ==================================
 
         let pedidoId;
 
@@ -664,10 +1933,9 @@ app.post(
         }
 
 
-        // ----------------------------------
-        // SE PEDIDO JÁ EXISTE
-        // NÃO DUPLICAR EXAMES
-        // ----------------------------------
+        // ==================================
+        // NÃO DUPLICAR PEDIDO
+        // ==================================
 
         if (
           pedidoExistente.rows.length > 0
@@ -678,15 +1946,14 @@ app.post(
         }
 
 
-        // ----------------------------------
+        // ==================================
         // EXAMES
-        // ----------------------------------
+        // ==================================
 
         for (
           const exame
           of pedidoData.exames
         ) {
-
 
           const novoExame =
             await client.query(
@@ -719,7 +1986,7 @@ app.post(
                 exame.material,
                 exame.metodo,
                 exame.resultadoTexto,
-                exame.unidade,
+                exame.unidade || null,
                 exame.referenciaTexto,
                 exame.observacoes
               ]
@@ -733,12 +2000,14 @@ app.post(
           examesInseridos++;
 
 
-          // --------------------------------
-          // ITENS DO EXAME
-          // --------------------------------
+          // =================================
+          // ITENS
+          // =================================
 
           if (
-            Array.isArray(exame.itens)
+            Array.isArray(
+              exame.itens
+            )
           ) {
 
             for (
@@ -787,20 +2056,14 @@ app.post(
       }
 
 
-      // ------------------------------------
-      // FINALIZAR TRANSAÇÃO
-      // ------------------------------------
+      await client.query(
+        "COMMIT"
+      );
 
-      await client.query("COMMIT");
-
-
-      // ------------------------------------
-      // RESPOSTA
-      // ------------------------------------
 
       res.json({
 
-        sucesso: true,
+        sucesso:true,
 
         mensagem:
           "Arquivo importado com sucesso!",
@@ -830,20 +2093,18 @@ app.post(
       });
 
 
-    } catch (error) {
+    } catch(error) {
 
-
-      // ------------------------------------
-      // DESFAZER TUDO SE HOUVER ERRO
-      // ------------------------------------
 
       if (client) {
 
         try {
 
-          await client.query("ROLLBACK");
+          await client.query(
+            "ROLLBACK"
+          );
 
-        } catch (rollbackError) {
+        } catch(rollbackError) {
 
           console.error(
             "Erro no rollback:",
@@ -863,7 +2124,7 @@ app.post(
 
       res.status(500).json({
 
-        sucesso: false,
+        sucesso:false,
 
         mensagem:
           "Erro ao importar o arquivo.",
@@ -876,7 +2137,6 @@ app.post(
 
     } finally {
 
-
       if (client) {
 
         client.release();
@@ -888,20 +2148,27 @@ app.post(
   }
 );
 
+
 // ========================================
-// TRATAMENTO DE ERROS DO MULTER
+// ERROS DO UPLOAD
 // ========================================
 
 app.use(
-  (error, req, res, next) => {
+  (
+    error,
+    req,
+    res,
+    next
+  ) => {
 
     if (
-      error instanceof multer.MulterError
+      error instanceof
+      multer.MulterError
     ) {
 
       return res.status(400).json({
 
-        sucesso: false,
+        sucesso:false,
 
         mensagem:
           "Erro no upload do arquivo.",
@@ -917,12 +2184,12 @@ app.use(
     if (
       error &&
       error.message ===
-        "Apenas arquivos TXT são permitidos."
+      "Apenas arquivos TXT são permitidos."
     ) {
 
       return res.status(400).json({
 
-        sucesso: false,
+        sucesso:false,
 
         mensagem:
           "Somente arquivos TXT são permitidos."
@@ -936,6 +2203,7 @@ app.use(
 
   }
 );
+
 
 // ========================================
 // SERVIDOR
