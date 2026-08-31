@@ -1,32 +1,34 @@
-const express = require("express");
-const multer = require("multer");
-const { Pool } = require("pg");
+const express = require('express');
+const multer = require('multer');
+const { Pool } = require('pg');
 
-const { parseTXT } = require("./parser");
+const { parseTXT } = require('./parser');
+
 const {
   buscarPacientes,
   buscarPedidosPorPaciente,
   buscarPedido
-} = require("./consultas");
+} = require('./consultas');
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
 
-// ========================================
-// POSTGRES
-// ========================================
+// ======================================================
+// POSTGRESQL
+// ======================================================
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
+
+  ssl: process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : false
 });
 
-// ========================================
+// ======================================================
 // UPLOAD
-// ========================================
+// ======================================================
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -35,26 +37,33 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024
   },
 
-  fileFilter: (req, file, cb) => {
-    if (!file.originalname.toLowerCase().endsWith(".txt")) {
-      return cb(new Error("Apenas arquivos TXT são permitidos."));
+  fileFilter: function(req, file, cb) {
+
+    if (!file.originalname.toLowerCase().endsWith('.txt')) {
+
+      return cb(
+        new Error('Apenas arquivos TXT são permitidos.')
+      );
+
     }
 
     cb(null, true);
+
   }
+
 });
 
-// ========================================
+// ======================================================
 // MIDDLEWARE
-// ========================================
+// ======================================================
 
 app.use(express.json());
 
-// ========================================
+// ======================================================
 // PÁGINA PRINCIPAL
-// ========================================
+// ======================================================
 
-app.get("/", (req, res) => {
+app.get('/', function(req, res) {
 
   res.send(`
 <!DOCTYPE html>
@@ -69,9 +78,13 @@ app.get("/", (req, res) => {
   content="width=device-width, initial-scale=1.0"
 >
 
-<title>Laboratorio Maiolini e Miranda</title>
+<title>Laboratório Maiolini e Miranda</title>
 
 <style>
+
+/* =====================================================
+   BASE
+===================================================== */
 
 * {
   box-sizing: border-box;
@@ -79,138 +92,494 @@ app.get("/", (req, res) => {
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f4f6f8;
-  color: #1f2937;
+  background: #f3f5f8;
+  color: #172033;
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 }
+
+button,
+input {
+  font-family: inherit;
+}
+
+/* =====================================================
+   TOPO
+===================================================== */
+
+.topbar {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.topbar-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #1769e0;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.brand-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* =====================================================
+   CONTAINER
+===================================================== */
 
 .container {
-  max-width: 1000px;
-  margin: 50px auto;
-  padding: 20px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 36px 24px 60px;
 }
 
-.header {
-  background: white;
-  padding: 30px;
-  border-radius: 14px;
-  box-shadow: 0 5px 25px rgba(0,0,0,0.08);
-  margin-bottom: 25px;
+/* =====================================================
+   BUSCA
+===================================================== */
+
+.search-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow:
+    0 8px 30px rgba(15, 23, 42, 0.06);
 }
 
-.header h1 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-}
-
-.header p {
+.search-title {
   margin: 0;
-  color: #6b7280;
+  font-size: 25px;
 }
 
-.card {
-  background: white;
-  padding: 30px;
-  border-radius: 14px;
-  box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+.search-description {
+  margin: 8px 0 24px;
+  color: #64748b;
 }
 
-.busca {
+.search-row {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 12px;
 }
 
-.busca input {
+.search-input {
   flex: 1;
-  padding: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  min-width: 0;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   font-size: 16px;
+  outline: none;
 }
 
-button {
-  border: none;
-  border-radius: 8px;
-  padding: 14px 22px;
-  background: #2563eb;
-  color: white;
-  font-weight: bold;
+.search-input:focus {
+  border-color: #1769e0;
+  box-shadow:
+    0 0 0 3px rgba(23, 105, 224, 0.10);
+}
+
+.primary-button {
+  height: 52px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 10px;
+  background: #1769e0;
+  color: #ffffff;
+  font-weight: 700;
   cursor: pointer;
 }
 
-button:hover {
-  background: #1d4ed8;
+.primary-button:hover {
+  background: #1258bd;
 }
 
-.resultado {
-  margin-top: 25px;
+/* =====================================================
+   RESULTADOS DA BUSCA
+===================================================== */
+
+.results {
+  margin-top: 24px;
 }
 
-.paciente {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+.patient-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 20px;
   margin-bottom: 12px;
   cursor: pointer;
-  transition: 0.15s;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
 }
 
-.paciente:hover {
-  background: #f8fafc;
-  border-color: #2563eb;
+.patient-card:hover {
+  transform: translateY(-1px);
+  border-color: #1769e0;
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.07);
 }
 
-.paciente-nome {
+.patient-name {
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 7px;
 }
 
-.paciente-info {
-  color: #6b7280;
+.patient-info {
+  color: #64748b;
   font-size: 14px;
 }
 
-.vazio {
-  padding: 25px;
+.patient-arrow {
+  float: right;
+  color: #1769e0;
+  font-size: 22px;
+}
+
+.message {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 22px;
   text-align: center;
-  color: #6b7280;
+  color: #64748b;
 }
 
-.loading {
-  padding: 25px;
-  text-align: center;
+/* =====================================================
+   PEDIDO
+===================================================== */
+
+.order-header {
+  margin-top: 24px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.acoes {
-  margin-top: 20px;
+.order-header-main {
+  padding: 28px 30px;
 }
 
-.secundario {
-  background: #6b7280;
+.order-label {
+  color: #1769e0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.secundario:hover {
-  background: #4b5563;
+.order-patient {
+  margin: 7px 0 20px;
+  font-size: 27px;
 }
 
-hr {
+.order-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+
+.order-detail {
+  min-width: 150px;
+}
+
+.order-detail-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.order-detail-value {
+  font-weight: 700;
+}
+
+/* =====================================================
+   AÇÕES
+===================================================== */
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.secondary-button {
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: #f8fafc;
+}
+
+.print-button {
+  height: 44px;
+  padding: 0 18px;
   border: 0;
-  border-top: 1px solid #e5e7eb;
-  margin: 25px 0;
+  border-radius: 9px;
+  background: #172033;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-table {
+.print-button:hover {
+  background: #0f172a;
+}
+
+/* =====================================================
+   EXAMES
+===================================================== */
+
+.exam-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.exam-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.exam-header {
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.exam-name {
+  margin: 0;
+  font-size: 19px;
+  color: #172033;
+}
+
+.exam-meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.exam-body {
+  padding: 20px 22px;
+}
+
+.result-box {
+  background: #f1f6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 17px;
+  margin-bottom: 17px;
+}
+
+.result-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.result-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1455a5;
+}
+
+.exam-info {
+  margin-top: 14px;
+}
+
+.exam-info-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.exam-info-text {
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.item-table-wrapper {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.item-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th,
-td {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+.item-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
   text-align: left;
+  padding: 11px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.item-table td {
+  padding: 12px 11px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: top;
+}
+
+.item-table td:nth-child(2) {
+  font-weight: 700;
+}
+
+/* =====================================================
+   RODAPÉ
+===================================================== */
+
+.footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 35px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* =====================================================
+   RESPONSIVO
+===================================================== */
+
+@media (max-width: 700px) {
+
+  .topbar-inner {
+    padding: 17px;
+  }
+
+  .container {
+    padding: 20px 14px 40px;
+  }
+
+  .search-card {
+    padding: 22px;
+  }
+
+  .search-row {
+    flex-direction: column;
+  }
+
+  .primary-button {
+    width: 100%;
+  }
+
+  .order-header-main {
+    padding: 22px;
+  }
+
+  .order-patient {
+    font-size: 23px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .secondary-button,
+  .print-button {
+    width: 100%;
+  }
+
+  .exam-header,
+  .exam-body {
+    padding: 17px;
+  }
+
+}
+
+/* =====================================================
+   IMPRESSÃO
+===================================================== */
+
+@media print {
+
+  body {
+    background: #ffffff;
+  }
+
+  .topbar {
+    border: 0;
+  }
+
+  .search-card {
+    display: none;
+  }
+
+  .actions {
+    display: none;
+  }
+
+  .container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .order-header,
+  .exam-card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .footer {
+    display: none;
+  }
+
 }
 
 </style>
@@ -219,40 +588,60 @@ td {
 
 <body>
 
-<div class="container">
+<header class="topbar">
 
-  <div class="header">
+  <div class="topbar-inner">
 
-    <h1>
-      Laboratorio Maiolini e Miranda
-    </h1>
+    <div class="brand">
 
-    <p>
-      Portal de exames laboratoriais
-    </p>
+      <div class="brand-logo">
+        LM
+      </div>
+
+      <div>
+
+        <div class="brand-name">
+          Laboratório Maiolini e Miranda
+        </div>
+
+        <div class="brand-subtitle">
+          Portal de exames laboratoriais
+        </div>
+
+      </div>
+
+    </div>
 
   </div>
 
-  <div class="card">
+</header>
 
-    <h2>
+<main class="container">
+
+  <section class="search-card">
+
+    <h1 class="search-title">
       Buscar paciente
-    </h2>
+    </h1>
 
-    <p>
-      Digite o nome do paciente ou código.
+    <p class="search-description">
+      Consulte pacientes e resultados de exames.
     </p>
 
-    <div class="busca">
+    <div class="search-row">
 
       <input
         id="termo"
+        class="search-input"
         type="text"
         placeholder="Nome ou código do paciente"
         autocomplete="off"
       >
 
-      <button onclick="buscar()">
+      <button
+        class="primary-button"
+        onclick="buscar()"
+      >
         BUSCAR
       </button>
 
@@ -260,84 +649,106 @@ td {
 
     <div
       id="resultado"
-      class="resultado"
+      class="results"
     ></div>
 
-  </div>
+  </section>
 
-</div>
+</main>
+
+<footer class="footer">
+
+  Laboratório Maiolini e Miranda
+
+</footer>
 
 <script>
 
-var campo = document.getElementById("termo");
+var campo =
+  document.getElementById('termo');
 
-var resultado = document.getElementById("resultado");
+var resultado =
+  document.getElementById('resultado');
 
-// ========================================
+// ======================================================
 // ENTER
-// ========================================
+// ======================================================
 
-campo.addEventListener("keydown", function(event) {
+campo.addEventListener(
+  'keydown',
+  function(event) {
 
-  if (event.key === "Enter") {
-    buscar();
+    if (event.key === 'Enter') {
+      buscar();
+    }
+
   }
+);
 
-});
-
-// ========================================
+// ======================================================
 // ESCAPAR HTML
-// ========================================
+// ======================================================
 
 function escapar(valor) {
 
-  if (valor === null || valor === undefined) {
-    return "";
+  if (
+    valor === null ||
+    valor === undefined
+  ) {
+    return '';
   }
 
   return String(valor)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 
 }
 
-// ========================================
+// ======================================================
 // DATA
-// ========================================
+// ======================================================
 
 function formatarData(data) {
 
   if (!data) {
-    return "-";
+    return '-';
   }
 
-  var partes = String(data)
-    .substring(0, 10)
-    .split("-");
+  var texto = String(data);
+
+  var partes =
+    texto.substring(0, 10).split('-');
 
   if (partes.length !== 3) {
-    return data;
+    return texto;
   }
 
-  return partes[2] + "/" + partes[1] + "/" + partes[0];
+  return (
+    partes[2] +
+    '/' +
+    partes[1] +
+    '/' +
+    partes[0]
+  );
 
 }
 
-// ========================================
+// ======================================================
 // BUSCAR PACIENTES
-// ========================================
+// ======================================================
 
 async function buscar() {
 
-  var termo = campo.value.trim();
+  var termo =
+    campo.value.trim();
 
   if (!termo) {
 
     resultado.innerHTML =
-      '<div class="vazio">' +
+      '<div class="message">' +
       'Digite o nome ou código do paciente.' +
       '</div>';
 
@@ -345,67 +756,85 @@ async function buscar() {
   }
 
   resultado.innerHTML =
-    '<div class="loading">Buscando...</div>';
+    '<div class="message">Buscando...</div>';
 
   try {
 
-    var resposta = await fetch(
-      "/api/pacientes?termo=" +
-      encodeURIComponent(termo)
-    );
+    var resposta =
+      await fetch(
+        '/api/pacientes?termo=' +
+        encodeURIComponent(termo)
+      );
 
-    var dados = await resposta.json();
+    var dados =
+      await resposta.json();
 
     if (!dados.sucesso) {
+
       throw new Error(
-        dados.mensagem || "Erro ao buscar pacientes."
+        dados.mensagem ||
+        'Erro ao buscar pacientes.'
       );
+
     }
 
-    if (!dados.pacientes || dados.pacientes.length === 0) {
+    if (
+      !dados.pacientes ||
+      dados.pacientes.length === 0
+    ) {
 
       resultado.innerHTML =
-        '<div class="vazio">' +
+        '<div class="message">' +
         'Nenhum paciente encontrado.' +
         '</div>';
 
       return;
     }
 
-    var html = "";
+    var html = '';
 
-    dados.pacientes.forEach(function(paciente) {
+    dados.pacientes.forEach(
+      function(paciente) {
 
-      html +=
-        '<div class="paciente" ' +
-        'onclick="abrirPaciente(' + paciente.id + ')">' +
+        html +=
+          '<div ' +
+          'class="patient-card" ' +
+          'onclick="abrirPaciente(' +
+          paciente.id +
+          ')">' +
 
-        '<div class="paciente-nome">' +
-        escapar(paciente.nome) +
-        '</div>' +
+          '<span class="patient-arrow">›</span>' +
 
-        '<div class="paciente-info">' +
+          '<div class="patient-name">' +
+          escapar(paciente.nome) +
+          '</div>' +
 
-        'Código: ' +
-        escapar(paciente.codigo_externo || "-") +
+          '<div class="patient-info">' +
 
-        ' &nbsp; • &nbsp; ' +
+          'Código: ' +
+          escapar(
+            paciente.codigo_externo || '-'
+          ) +
 
-        paciente.quantidade_pedidos +
-        ' pedido(s)' +
+          ' &nbsp; • &nbsp; ' +
 
-        '</div>' +
+          paciente.quantidade_pedidos +
 
-        '</div>';
+          ' pedido(s)' +
 
-    });
+          '</div>' +
+
+          '</div>';
+
+      }
+    );
 
     resultado.innerHTML = html;
 
   } catch (erro) {
 
     resultado.innerHTML =
-      '<div class="vazio">' +
+      '<div class="message">' +
       'Erro: ' +
       escapar(erro.message) +
       '</div>';
@@ -414,78 +843,63 @@ async function buscar() {
 
 }
 
-// ========================================
+// ======================================================
 // PEDIDOS DO PACIENTE
-// ========================================
+// ======================================================
 
 async function abrirPaciente(pacienteId) {
 
   resultado.innerHTML =
-    '<div class="loading">' +
+    '<div class="message">' +
     'Carregando pedidos...' +
     '</div>';
 
   try {
 
-    var resposta = await fetch(
-      "/api/pacientes/" +
-      pacienteId +
-      "/pedidos"
-    );
+    var resposta =
+      await fetch(
+        '/api/pacientes/' +
+        pacienteId +
+        '/pedidos'
+      );
 
-    var dados = await resposta.json();
+    var dados =
+      await resposta.json();
 
     if (!dados.sucesso) {
-      throw new Error(dados.mensagem);
-    }
 
-    var html =
-      '<h2>Pedidos do paciente</h2>';
-
-    if (!dados.pedidos || dados.pedidos.length === 0) {
-
-      html +=
-        '<div class="vazio">' +
-        'Nenhum pedido encontrado.' +
-        '</div>';
-
-    } else {
-
-      dados.pedidos.forEach(function(pedido) {
-
-        html +=
-          '<div class="paciente" ' +
-          'onclick="abrirPedido(' + pedido.id + ')">' +
-
-          '<div class="paciente-nome">' +
-
-          'Pedido: ' +
-          escapar(pedido.numero_pedido) +
-
-          '</div>' +
-
-          '<div class="paciente-info">' +
-
-          'Coleta: ' +
-          formatarData(pedido.data_coleta) +
-
-          ' &nbsp; • &nbsp; ' +
-
-          pedido.quantidade_exames +
-          ' exame(s)' +
-
-          '</div>' +
-
-          '</div>';
-
-      });
+      throw new Error(
+        dados.mensagem ||
+        'Erro ao carregar pedidos.'
+      );
 
     }
+
+    var html = '';
 
     html +=
-      '<div class="acoes">' +
+      '<div class="order-header">' +
 
-      '<button class="secundario" onclick="buscar()">' +
+      '<div class="order-header-main">' +
+
+      '<div class="order-label">' +
+      'Histórico do paciente' +
+      '</div>' +
+
+      '<h2 class="order-patient">' +
+      'Pedidos encontrados' +
+      '</h2>' +
+
+      '</div>' +
+
+      '</div>';
+
+    html +=
+      '<div class="actions">' +
+
+      '<button ' +
+      'class="secondary-button" ' +
+      'onclick="voltarBusca()">' +
 
       '← VOLTAR' +
 
@@ -493,12 +907,69 @@ async function abrirPaciente(pacienteId) {
 
       '</div>';
 
+    if (
+      !dados.pedidos ||
+      dados.pedidos.length === 0
+    ) {
+
+      html +=
+        '<div class="message">' +
+        'Nenhum pedido encontrado.' +
+        '</div>';
+
+    } else {
+
+      dados.pedidos.forEach(
+        function(pedido) {
+
+          html +=
+            '<div ' +
+            'class="patient-card" ' +
+            'onclick="abrirPedido(' +
+            pedido.id +
+            ')">' +
+
+            '<span class="patient-arrow">›</span>' +
+
+            '<div class="patient-name">' +
+
+            'Pedido ' +
+
+            escapar(
+              pedido.numero_pedido
+            ) +
+
+            '</div>' +
+
+            '<div class="patient-info">' +
+
+            'Data da coleta: ' +
+
+            formatarData(
+              pedido.data_coleta
+            ) +
+
+            ' &nbsp; • &nbsp; ' +
+
+            pedido.quantidade_exames +
+
+            ' exame(s)' +
+
+            '</div>' +
+
+            '</div>';
+
+        }
+      );
+
+    }
+
     resultado.innerHTML = html;
 
   } catch (erro) {
 
     resultado.innerHTML =
-      '<div class="vazio">' +
+      '<div class="message">' +
       'Erro: ' +
       escapar(erro.message) +
       '</div>';
@@ -507,216 +978,370 @@ async function abrirPaciente(pacienteId) {
 
 }
 
-// ========================================
-// PEDIDO COMPLETO
-// ========================================
+// ======================================================
+// PEDIDO E EXAMES
+// ======================================================
 
 async function abrirPedido(pedidoId) {
 
   resultado.innerHTML =
-    '<div class="loading">' +
-    'Carregando exames...' +
+    '<div class="message">' +
+    'Carregando resultado...' +
     '</div>';
 
   try {
 
-    var resposta = await fetch(
-      "/api/pedidos/" + pedidoId
-    );
+    var resposta =
+      await fetch(
+        '/api/pedidos/' +
+        pedidoId
+      );
 
-    var dados = await resposta.json();
+    var dados =
+      await resposta.json();
 
     if (!dados.sucesso) {
-      throw new Error(dados.mensagem);
+
+      throw new Error(
+        dados.mensagem ||
+        'Erro ao carregar pedido.'
+      );
+
     }
 
-    var pedido = dados.pedido;
+    var pedido =
+      dados.pedido;
 
-    var html =
-      '<h2>' +
+    var html = '';
+
+    // --------------------------------------------------
+    // CABEÇALHO DO PEDIDO
+    // --------------------------------------------------
+
+    html +=
+      '<div class="order-header">' +
+
+      '<div class="order-header-main">' +
+
+      '<div class="order-label">' +
+      'Resultado de exames' +
+      '</div>' +
+
+      '<h2 class="order-patient">' +
       escapar(pedido.paciente_nome) +
-      '</h2>';
+      '</h2>' +
 
-    html +=
-      '<p>' +
-      '<strong>Pedido:</strong> ' +
+      '<div class="order-details">' +
+
+      '<div class="order-detail">' +
+
+      '<span class="order-detail-label">' +
+      'Pedido' +
+      '</span>' +
+
+      '<span class="order-detail-value">' +
       escapar(pedido.numero_pedido) +
-      '</p>';
+      '</span>' +
 
-    html +=
-      '<p>' +
-      '<strong>Data da coleta:</strong> ' +
+      '</div>' +
+
+      '<div class="order-detail">' +
+
+      '<span class="order-detail-label">' +
+      'Data da coleta' +
+      '</span>' +
+
+      '<span class="order-detail-value">' +
       formatarData(pedido.data_coleta) +
-      '</p>';
+      '</span>' +
 
-    html += '<hr>';
+      '</div>' +
 
-    if (!pedido.exames || pedido.exames.length === 0) {
+      '</div>' +
 
-      html +=
-        '<div class="vazio">' +
-        'Nenhum exame encontrado.' +
-        '</div>';
+      '</div>' +
 
-    }
+      '</div>';
 
-    pedido.exames.forEach(function(exame) {
-
-      html +=
-        '<div class="paciente" style="cursor:default">';
-
-      html +=
-        '<div class="paciente-nome">' +
-        escapar(exame.nome) +
-        '</div>';
-
-      if (exame.material) {
-
-        html +=
-          '<div class="paciente-info">' +
-          '<strong>Material:</strong> ' +
-          escapar(exame.material) +
-          '</div>';
-
-      }
-
-      if (exame.metodo) {
-
-        html +=
-          '<div class="paciente-info">' +
-          '<strong>Método:</strong> ' +
-          escapar(exame.metodo) +
-          '</div>';
-
-      }
-
-      if (
-        exame.itens &&
-        exame.itens.length > 0
-      ) {
-
-        html +=
-          '<div style="margin-top:15px;overflow-x:auto">' +
-
-          '<table>' +
-
-          '<thead>' +
-
-          '<tr>' +
-
-          '<th>Exame</th>' +
-          '<th>Resultado</th>' +
-          '<th>Referência</th>' +
-
-          '</tr>' +
-
-          '</thead>' +
-
-          '<tbody>';
-
-        exame.itens.forEach(function(item) {
-
-          html +=
-            '<tr>' +
-
-            '<td>' +
-            escapar(item.nome) +
-            '</td>' +
-
-            '<td><strong>' +
-            escapar(item.resultado || "-") +
-            '</strong></td>' +
-
-            '<td>' +
-            escapar(item.referencia || "-") +
-            '</td>' +
-
-            '</tr>';
-
-        });
-
-        html +=
-          '</tbody>' +
-          '</table>' +
-          '</div>';
-
-      } else {
-
-        if (exame.resultado_texto) {
-
-          html +=
-            '<div style="' +
-            'margin-top:15px;' +
-            'padding:15px;' +
-            'background:#f8fafc;' +
-            'border-radius:8px;' +
-            '">' +
-
-            '<strong>Resultado:</strong> ' +
-
-            escapar(exame.resultado_texto) +
-
-            '</div>';
-
-        }
-
-        if (exame.referencia_texto) {
-
-          html +=
-            '<div style="' +
-            'margin-top:10px;' +
-            'color:#6b7280;' +
-            '">' +
-
-            '<strong>Referência:</strong> ' +
-
-            escapar(exame.referencia_texto) +
-
-            '</div>';
-
-        }
-
-      }
-
-      if (exame.observacoes) {
-
-        html +=
-          '<div style="' +
-          'margin-top:15px;' +
-          'color:#6b7280;' +
-          '">' +
-
-          '<strong>Observações:</strong><br>' +
-
-          escapar(exame.observacoes) +
-
-          '</div>';
-
-      }
-
-      html += '</div>';
-
-    });
+    // --------------------------------------------------
+    // BOTÕES
+    // --------------------------------------------------
 
     html +=
-      '<div class="acoes">' +
+      '<div class="actions">' +
 
       '<button ' +
-      'class="secundario" ' +
-      'onclick="buscar()">' +
+      'class="secondary-button" ' +
+      'onclick="voltarBusca()">' +
 
       '← NOVA BUSCA' +
 
       '</button>' +
 
+      '<button ' +
+      'class="print-button" ' +
+      'onclick="window.print()">' +
+
+      'IMPRIMIR RESULTADO' +
+
+      '</button>' +
+
+      '</div>';
+
+    // --------------------------------------------------
+    // LISTA DE EXAMES
+    // --------------------------------------------------
+
+    html +=
+      '<div class="exam-list">';
+
+    if (
+      !pedido.exames ||
+      pedido.exames.length === 0
+    ) {
+
+      html +=
+        '<div class="message">' +
+        'Nenhum exame encontrado neste pedido.' +
+        '</div>';
+
+    } else {
+
+      pedido.exames.forEach(
+        function(exame) {
+
+          html +=
+            '<article class="exam-card">';
+
+          // --------------------------------------------
+          // CABEÇALHO
+          // --------------------------------------------
+
+          html +=
+            '<div class="exam-header">' +
+
+            '<h3 class="exam-name">' +
+            escapar(exame.nome) +
+            '</h3>';
+
+          var temMeta =
+            exame.material ||
+            exame.metodo;
+
+          if (temMeta) {
+
+            html +=
+              '<div class="exam-meta">';
+
+            if (exame.material) {
+
+              html +=
+                '<span>' +
+                '<strong>Material:</strong> ' +
+                escapar(exame.material) +
+                '</span>';
+
+            }
+
+            if (exame.metodo) {
+
+              html +=
+                '<span>' +
+                '<strong>Método:</strong> ' +
+                escapar(exame.metodo) +
+                '</span>';
+
+            }
+
+            html +=
+              '</div>';
+
+          }
+
+          html +=
+            '</div>';
+
+          // --------------------------------------------
+          // CORPO
+          // --------------------------------------------
+
+          html +=
+            '<div class="exam-body">';
+
+          // --------------------------------------------
+          // ITENS
+          // --------------------------------------------
+
+          if (
+            exame.itens &&
+            exame.itens.length > 0
+          ) {
+
+            html +=
+              '<div class="item-table-wrapper">' +
+
+              '<table class="item-table">' +
+
+              '<thead>' +
+
+              '<tr>' +
+
+              '<th>Exame</th>' +
+              '<th>Resultado</th>' +
+              '<th>Unidade</th>' +
+              '<th>Referência</th>' +
+
+              '</tr>' +
+
+              '</thead>' +
+
+              '<tbody>';
+
+            exame.itens.forEach(
+              function(item) {
+
+                html +=
+                  '<tr>' +
+
+                  '<td>' +
+                  escapar(item.nome) +
+                  '</td>' +
+
+                  '<td>' +
+                  escapar(
+                    item.resultado || '-'
+                  ) +
+                  '</td>' +
+
+                  '<td>' +
+                  escapar(
+                    item.unidade || '-'
+                  ) +
+                  '</td>' +
+
+                  '<td>' +
+                  escapar(
+                    item.referencia || '-'
+                  ) +
+                  '</td>' +
+
+                  '</tr>';
+
+              }
+            );
+
+            html +=
+              '</tbody>' +
+              '</table>' +
+              '</div>';
+
+          } else {
+
+            // ------------------------------------------
+            // RESULTADO SIMPLES
+            // ------------------------------------------
+
+            if (
+              exame.resultado_texto
+            ) {
+
+              html +=
+                '<div class="result-box">' +
+
+                '<span class="result-label">' +
+                'Resultado' +
+                '</span>' +
+
+                '<div class="result-value">' +
+                escapar(
+                  exame.resultado_texto
+                ) +
+                (
+                  exame.unidade
+                    ? ' ' +
+                      escapar(exame.unidade)
+                    : ''
+                ) +
+                '</div>' +
+
+                '</div>';
+
+            }
+
+            // ------------------------------------------
+            // REFERÊNCIA
+            // ------------------------------------------
+
+            if (
+              exame.referencia_texto
+            ) {
+
+              html +=
+                '<div class="exam-info">' +
+
+                '<span class="exam-info-label">' +
+                'Referência' +
+                '</span>' +
+
+                '<div class="exam-info-text">' +
+                escapar(
+                  exame.referencia_texto
+                ) +
+                '</div>' +
+
+                '</div>';
+
+            }
+
+          }
+
+          // --------------------------------------------
+          // OBSERVAÇÕES
+          // --------------------------------------------
+
+          if (exame.observacoes) {
+
+            html +=
+              '<div class="exam-info">' +
+
+              '<span class="exam-info-label">' +
+              'Observações' +
+              '</span>' +
+
+              '<div class="exam-info-text">' +
+              escapar(
+                exame.observacoes
+              ) +
+              '</div>' +
+
+              '</div>';
+
+          }
+
+          html +=
+            '</div>' +
+
+            '</article>';
+
+        }
+      );
+
+    }
+
+    html +=
       '</div>';
 
     resultado.innerHTML = html;
 
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+
   } catch (erro) {
 
     resultado.innerHTML =
-      '<div class="vazio">' +
+      '<div class="message">' +
       'Erro: ' +
       escapar(erro.message) +
       '</div>';
@@ -724,6 +1349,22 @@ async function abrirPedido(pedidoId) {
   }
 
 }
+
+// ======================================================
+// VOLTAR
+// ======================================================
+
+function voltarBusca() {
+
+  resultado.innerHTML = '';
+
+  campo.focus();
+
+}
+
+// ======================================================
+// FIM
+// ======================================================
 
 </script>
 
@@ -734,105 +1375,148 @@ async function abrirPedido(pedidoId) {
 
 });
 
-// ========================================
-// TESTE DO POSTGRES
-// ========================================
+// ======================================================
+// TESTE DO BANCO
+// ======================================================
 
-app.get("/db", async (req, res) => {
-
-  try {
-
-    const result = await pool.query(`
-      SELECT
-        NOW() AS horario,
-        current_database() AS banco
-    `);
-
-    res.json({
-      sucesso: true,
-      mensagem: "PostgreSQL conectado com sucesso!",
-      horario: result.rows[0].horario,
-      banco: result.rows[0].banco
-    });
-
-  } catch (error) {
-
-    console.error("Erro PostgreSQL:", error);
-
-    res.status(500).json({
-      sucesso: false,
-      mensagem: "Erro ao conectar ao PostgreSQL",
-      erro: error.message
-    });
-
-  }
-
-});
-
-// ========================================
-// BUSCAR PACIENTES
-// ========================================
-
-app.get("/api/pacientes", async (req, res) => {
+app.get('/db', async function(req, res) {
 
   try {
 
-    const termo = String(
-      req.query.termo || ""
-    ).trim();
-
-    if (!termo) {
-
-      return res.status(400).json({
-        sucesso: false,
-        mensagem: "Informe um nome ou código."
-      });
-
-    }
-
-    const pacientes =
-      await buscarPacientes(termo);
+    const result =
+      await pool.query(
+        `
+        SELECT
+          NOW() AS horario,
+          current_database() AS banco
+        `
+      );
 
     res.json({
+
       sucesso: true,
-      pacientes
+
+      mensagem:
+        'PostgreSQL conectado com sucesso!',
+
+      horario:
+        result.rows[0].horario,
+
+      banco:
+        result.rows[0].banco
+
     });
 
   } catch (error) {
 
     console.error(
-      "Erro ao buscar pacientes:",
+      'Erro PostgreSQL:',
       error
     );
 
     res.status(500).json({
+
       sucesso: false,
-      mensagem: "Erro ao buscar pacientes.",
-      erro: error.message
+
+      mensagem:
+        'Erro ao conectar ao PostgreSQL',
+
+      erro:
+        error.message
+
     });
 
   }
 
 });
 
-// ========================================
-// PEDIDOS DO PACIENTE
-// ========================================
+// ======================================================
+// BUSCAR PACIENTES
+// ======================================================
 
 app.get(
-  "/api/pacientes/:id/pedidos",
-  async (req, res) => {
+  '/api/pacientes',
+  async function(req, res) {
+
+    try {
+
+      const termo =
+        String(
+          req.query.termo || ''
+        ).trim();
+
+      if (!termo) {
+
+        return res.status(400).json({
+
+          sucesso: false,
+
+          mensagem:
+            'Informe um nome ou código.'
+
+        });
+
+      }
+
+      const pacientes =
+        await buscarPacientes(termo);
+
+      res.json({
+
+        sucesso: true,
+
+        pacientes
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        'Erro ao buscar pacientes:',
+        error
+      );
+
+      res.status(500).json({
+
+        sucesso: false,
+
+        mensagem:
+          'Erro ao buscar pacientes.',
+
+        erro:
+          error.message
+
+      });
+
+    }
+
+  }
+);
+
+// ======================================================
+// PEDIDOS DO PACIENTE
+// ======================================================
+
+app.get(
+  '/api/pacientes/:id/pedidos',
+  async function(req, res) {
 
     try {
 
       const pacienteId =
         Number(req.params.id);
 
-      if (!Number.isInteger(pacienteId)) {
+      if (
+        !Number.isInteger(pacienteId)
+      ) {
 
         return res.status(400).json({
+
           sucesso: false,
-          mensagem: "ID do paciente inválido."
+
+          mensagem:
+            'ID do paciente inválido.'
+
         });
 
       }
@@ -843,21 +1527,30 @@ app.get(
         );
 
       res.json({
+
         sucesso: true,
+
         pedidos
+
       });
 
     } catch (error) {
 
       console.error(
-        "Erro ao buscar pedidos:",
+        'Erro ao buscar pedidos:',
         error
       );
 
       res.status(500).json({
+
         sucesso: false,
-        mensagem: "Erro ao buscar pedidos.",
-        erro: error.message
+
+        mensagem:
+          'Erro ao buscar pedidos.',
+
+        erro:
+          error.message
+
       });
 
     }
@@ -865,24 +1558,30 @@ app.get(
   }
 );
 
-// ========================================
+// ======================================================
 // PEDIDO COMPLETO
-// ========================================
+// ======================================================
 
 app.get(
-  "/api/pedidos/:id",
-  async (req, res) => {
+  '/api/pedidos/:id',
+  async function(req, res) {
 
     try {
 
       const pedidoId =
         Number(req.params.id);
 
-      if (!Number.isInteger(pedidoId)) {
+      if (
+        !Number.isInteger(pedidoId)
+      ) {
 
         return res.status(400).json({
+
           sucesso: false,
-          mensagem: "ID do pedido inválido."
+
+          mensagem:
+            'ID do pedido inválido.'
+
         });
 
       }
@@ -893,28 +1592,41 @@ app.get(
       if (!pedido) {
 
         return res.status(404).json({
+
           sucesso: false,
-          mensagem: "Pedido não encontrado."
+
+          mensagem:
+            'Pedido não encontrado.'
+
         });
 
       }
 
       res.json({
+
         sucesso: true,
+
         pedido
+
       });
 
     } catch (error) {
 
       console.error(
-        "Erro ao buscar pedido:",
+        'Erro ao buscar pedido:',
         error
       );
 
       res.status(500).json({
+
         sucesso: false,
-        mensagem: "Erro ao buscar pedido.",
-        erro: error.message
+
+        mensagem:
+          'Erro ao buscar pedido.',
+
+        erro:
+          error.message
+
       });
 
     }
@@ -922,13 +1634,15 @@ app.get(
   }
 );
 
-// ========================================
-// TELA DE IMPORTAÇÃO
-// ========================================
+// ======================================================
+// PÁGINA DE IMPORTAÇÃO
+// ======================================================
 
-app.get("/importar", (req, res) => {
+app.get(
+  '/importar',
+  function(req, res) {
 
-  res.send(`
+    res.send(`
 <!DOCTYPE html>
 
 <html lang="pt-BR">
@@ -948,8 +1662,9 @@ app.get("/importar", (req, res) => {
 
 body {
   margin: 0;
+  background: #f3f5f8;
+  color: #172033;
   font-family: Arial, Helvetica, sans-serif;
-  background: #f4f6f8;
 }
 
 .container {
@@ -959,10 +1674,11 @@ body {
 }
 
 .card {
-  background: white;
-  padding: 35px;
-  border-radius: 14px;
-  box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 30px rgba(15, 23, 42, 0.07);
 }
 
 h1 {
@@ -971,19 +1687,19 @@ h1 {
 
 input {
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   margin: 15px 0 25px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
 }
 
 button {
   width: 100%;
-  padding: 15px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
+  padding: 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #1769e0;
+  color: #ffffff;
   font-weight: bold;
   cursor: pointer;
 }
@@ -992,14 +1708,14 @@ button {
   margin-top: 20px;
   padding: 15px;
   background: #f1f5f9;
-  border-radius: 8px;
+  border-radius: 9px;
   white-space: pre-wrap;
 }
 
 a {
   display: inline-block;
   margin-top: 20px;
-  color: #2563eb;
+  color: #1769e0;
 }
 
 </style>
@@ -1017,7 +1733,7 @@ Importar exames
 </h1>
 
 <p>
-Laboratorio Maiolini e Miranda
+Laboratório Maiolini e Miranda
 </p>
 
 <form id="formulario">
@@ -1052,41 +1768,48 @@ IMPORTAR EXAMES
 <script>
 
 var formulario =
-  document.getElementById("formulario");
+  document.getElementById('formulario');
 
 var resultado =
-  document.getElementById("resultado");
+  document.getElementById('resultado');
 
 formulario.addEventListener(
-  "submit",
+  'submit',
   async function(event) {
 
     event.preventDefault();
 
     var arquivo =
-      document.getElementById("arquivo").files[0];
+      document.getElementById('arquivo').files[0];
 
     if (!arquivo) {
       return;
     }
 
-    var dados = new FormData();
+    var dados =
+      new FormData();
 
-    dados.append("arquivo", arquivo);
+    dados.append(
+      'arquivo',
+      arquivo
+    );
 
-    resultado.style.display = "block";
+    resultado.style.display =
+      'block';
 
-    resultado.textContent = "Importando...";
+    resultado.textContent =
+      'Importando...';
 
     try {
 
-      var resposta = await fetch(
-        "/importar",
-        {
-          method: "POST",
-          body: dados
-        }
-      );
+      var resposta =
+        await fetch(
+          '/importar',
+          {
+            method: 'POST',
+            body: dados
+          }
+        );
 
       var json =
         await resposta.json();
@@ -1101,7 +1824,7 @@ formulario.addEventListener(
     } catch (error) {
 
       resultado.textContent =
-        "Erro: " +
+        'Erro: ' +
         error.message;
 
     }
@@ -1114,24 +1837,29 @@ formulario.addEventListener(
 </body>
 
 </html>
-  `);
+    `);
 
-});
+  }
+);
 
-// ========================================
-// IMPORTAÇÃO TXT
-// ========================================
+// ======================================================
+// IMPORTAR TXT
+// ======================================================
 
 app.post(
-  "/importar",
-  upload.single("arquivo"),
-  async (req, res) => {
+  '/importar',
+  upload.single('arquivo'),
+  async function(req, res) {
 
     if (!req.file) {
 
       return res.status(400).json({
+
         sucesso: false,
-        mensagem: "Nenhum arquivo TXT foi enviado."
+
+        mensagem:
+          'Nenhum arquivo TXT foi enviado.'
+
       });
 
     }
@@ -1141,7 +1869,7 @@ app.post(
     try {
 
       const conteudo =
-        req.file.buffer.toString("utf8");
+        req.file.buffer.toString('utf8');
 
       const pedidos =
         parseTXT(conteudo);
@@ -1152,9 +1880,12 @@ app.post(
       ) {
 
         return res.status(400).json({
+
           sucesso: false,
+
           mensagem:
-            "Nenhum pedido foi encontrado no arquivo."
+            'Nenhum pedido foi encontrado no arquivo.'
+
         });
 
       }
@@ -1162,7 +1893,7 @@ app.post(
       client =
         await pool.connect();
 
-      await client.query("BEGIN");
+      await client.query('BEGIN');
 
       let pacientesInseridos = 0;
       let pacientesExistentes = 0;
@@ -1171,7 +1902,9 @@ app.post(
       let examesInseridos = 0;
       let itensInseridos = 0;
 
-      for (const pedidoData of pedidos) {
+      for (
+        const pedidoData of pedidos
+      ) {
 
         const paciente =
           pedidoData.paciente;
@@ -1287,8 +2020,7 @@ app.post(
         }
 
         for (
-          const exame
-          of pedidoData.exames
+          const exame of pedidoData.exames
         ) {
 
           const novoExame =
@@ -1338,8 +2070,7 @@ app.post(
           ) {
 
             for (
-              const item
-              of exame.itens
+              const item of exame.itens
             ) {
 
               await client.query(
@@ -1352,7 +2083,14 @@ app.post(
                   referencia,
                   ordem
                 )
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES (
+                  $1,
+                  $2,
+                  $3,
+                  $4,
+                  $5,
+                  $6
+                )
                 `,
                 [
                   exameId,
@@ -1374,14 +2112,14 @@ app.post(
 
       }
 
-      await client.query("COMMIT");
+      await client.query('COMMIT');
 
       res.json({
 
         sucesso: true,
 
         mensagem:
-          "Arquivo importado com sucesso!",
+          'Arquivo importado com sucesso!',
 
         arquivo:
           req.file.originalname,
@@ -1412,18 +2150,24 @@ app.post(
       if (client) {
 
         try {
-          await client.query("ROLLBACK");
+
+          await client.query(
+            'ROLLBACK'
+          );
+
         } catch (rollbackError) {
+
           console.error(
-            "Erro no rollback:",
+            'Erro no rollback:',
             rollbackError
           );
+
         }
 
       }
 
       console.error(
-        "Erro na importação:",
+        'Erro na importação:',
         error
       );
 
@@ -1432,7 +2176,7 @@ app.post(
         sucesso: false,
 
         mensagem:
-          "Erro ao importar o arquivo.",
+          'Erro ao importar o arquivo.',
 
         erro:
           error.message
@@ -1450,26 +2194,27 @@ app.post(
   }
 );
 
-// ========================================
-// ERROS
-// ========================================
+// ======================================================
+// ERROS DO UPLOAD
+// ======================================================
 
 app.use(
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
+  function(error, req, res, next) {
 
     if (
       error instanceof multer.MulterError
     ) {
 
       return res.status(400).json({
+
         sucesso: false,
-        mensagem: "Erro no upload do arquivo.",
-        erro: error.message
+
+        mensagem:
+          'Erro no upload do arquivo.',
+
+        erro:
+          error.message
+
       });
 
     }
@@ -1477,13 +2222,16 @@ app.use(
     if (
       error &&
       error.message ===
-      "Apenas arquivos TXT são permitidos."
+      'Apenas arquivos TXT são permitidos.'
     ) {
 
       return res.status(400).json({
+
         sucesso: false,
+
         mensagem:
-          "Somente arquivos TXT são permitidos."
+          'Somente arquivos TXT são permitidos.'
+
       });
 
     }
@@ -1493,17 +2241,18 @@ app.use(
   }
 );
 
-// ========================================
+// ======================================================
 // SERVIDOR
-// ========================================
+// ======================================================
 
 app.listen(
   PORT,
-  "0.0.0.0",
-  () => {
+  '0.0.0.0',
+  function() {
 
     console.log(
-      "Servidor iniciado na porta " + PORT
+      'Servidor iniciado na porta ' +
+      PORT
     );
 
   }
