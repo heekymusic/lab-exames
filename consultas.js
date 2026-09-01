@@ -2,9 +2,16 @@ const { Pool } = require("pg");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
   ssl: process.env.NODE_ENV === "production"
     ? { rejectUnauthorized: false }
-    : false
+    : false,
+
+  // Evita ficar travado indefinidamente
+  connectionTimeoutMillis: 10000,
+
+  // Cancela consulta que demorar mais de 15 segundos
+  statement_timeout: 15000
 });
 
 
@@ -14,28 +21,33 @@ const pool = new Pool({
 
 async function buscarPacientes(termo) {
 
+  const busca = `%${String(termo || "").trim()}%`;
+
   const resultado = await pool.query(
     `
     SELECT
       p.id,
       p.nome,
       p.codigo_externo,
-      COUNT(pe.id)::integer AS quantidade_pedidos
+
+      (
+        SELECT COUNT(*)::integer
+        FROM pedidos pe
+        WHERE pe.paciente_id = p.id
+      ) AS quantidade_pedidos
+
     FROM pacientes p
-    LEFT JOIN pedidos pe
-      ON pe.paciente_id = p.id
+
     WHERE
       p.nome ILIKE $1
-      OR p.codigo_externo ILIKE $1
-    GROUP BY
-      p.id,
-      p.nome,
-      p.codigo_externo
+      OR CAST(p.codigo_externo AS TEXT) ILIKE $1
+
     ORDER BY
-      p.nome
+      p.nome ASC
+
     LIMIT 50
     `,
-    [`%${termo}%`]
+    [busca]
   );
 
   return resultado.rows;
@@ -55,17 +67,18 @@ async function buscarPedidosPorPaciente(pacienteId) {
       pe.numero_pedido,
       pe.data_entrada,
       pe.data_coleta,
-      COUNT(e.id)::integer AS quantidade_exames
+
+      (
+        SELECT COUNT(*)::integer
+        FROM exames e
+        WHERE e.pedido_id = pe.id
+      ) AS quantidade_exames
+
     FROM pedidos pe
-    LEFT JOIN exames e
-      ON e.pedido_id = pe.id
+
     WHERE
       pe.paciente_id = $1
-    GROUP BY
-      pe.id,
-      pe.numero_pedido,
-      pe.data_entrada,
-      pe.data_coleta
+
     ORDER BY
       pe.data_coleta DESC NULLS LAST,
       pe.id DESC
@@ -82,6 +95,10 @@ async function buscarPedidosPorPaciente(pacienteId) {
 // ========================================
 
 async function buscarPedido(pedidoId) {
+
+  // ----------------------------------------
+  // DADOS DO PEDIDO + PACIENTE
+  // ----------------------------------------
 
   const pedidoResult = await pool.query(
     `
@@ -100,13 +117,16 @@ async function buscarPedido(pedidoId) {
     INNER JOIN pacientes p
       ON p.id = pe.paciente_id
 
-    WHERE pe.id = $1
+    WHERE
+      pe.id = $1
 
     LIMIT 1
     `,
     [pedidoId]
   );
 
+
+  // Pedido não encontrado
 
   if (pedidoResult.rows.length === 0) {
     return null;
@@ -116,9 +136,9 @@ async function buscarPedido(pedidoId) {
   const pedido = pedidoResult.rows[0];
 
 
-  // ======================================
+  // ========================================
   // EXAMES
-  // ======================================
+  // ========================================
 
   const examesResult = await pool.query(
     `
@@ -134,17 +154,19 @@ async function buscarPedido(pedidoId) {
 
     FROM exames e
 
-    WHERE e.pedido_id = $1
+    WHERE
+      e.pedido_id = $1
 
-    ORDER BY e.id
+    ORDER BY
+      e.id ASC
     `,
     [pedidoId]
   );
 
 
-  // ======================================
+  // ========================================
   // ITENS DOS EXAMES
-  // ======================================
+  // ========================================
 
   const itensResult = await pool.query(
     `
@@ -162,26 +184,29 @@ async function buscarPedido(pedidoId) {
     INNER JOIN exames e
       ON e.id = ei.exame_id
 
-    WHERE e.pedido_id = $1
+    WHERE
+      e.pedido_id = $1
 
     ORDER BY
-      ei.exame_id,
-      ei.ordem,
-      ei.id
+      ei.exame_id ASC,
+      ei.ordem ASC,
+      ei.id ASC
     `,
     [pedidoId]
   );
 
 
-  // ======================================
+  // ========================================
   // ASSOCIAR ITENS AOS EXAMES
-  // ======================================
+  // ========================================
 
-  const exames = examesResult.rows.map((exame) => {
+  const exames = examesResult.rows.map(function(exame) {
 
-    const itens = itensResult.rows.filter(
-      (item) => item.exame_id === exame.id
-    );
+    const itens = itensResult.rows.filter(function(item) {
+
+      return Number(item.exame_id) === Number(exame.id);
+
+    });
 
 
     return {
@@ -192,12 +217,20 @@ async function buscarPedido(pedidoId) {
   });
 
 
+  // ========================================
+  // RETORNO FINAL
+  // ========================================
+
   return {
     ...pedido,
     exames
   };
 }
 
+
+// ========================================
+// EXPORTAR FUNÇÕES
+// ========================================
 
 module.exports = {
   buscarPacientes,
