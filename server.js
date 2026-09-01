@@ -18,7 +18,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
-    : false
+    : false,
+  connectionTimeoutMillis: 10000,
+  query_timeout: 15000,
+  statement_timeout: 15000
 });
 
 const upload = multer({
@@ -736,6 +739,33 @@ campo.addEventListener(
   }
 );
 
+async function buscarComTimeout(url, opcoes) {
+
+  var controlador = new AbortController();
+
+  var tempoLimite = setTimeout(
+    function() {
+      controlador.abort();
+    },
+    20000
+  );
+
+  try {
+
+    var configuracao = opcoes || {};
+
+    configuracao.signal = controlador.signal;
+
+    return await fetch(url, configuracao);
+
+  } finally {
+
+    clearTimeout(tempoLimite);
+
+  }
+
+}
+
 async function buscar() {
 
   var termo =
@@ -757,7 +787,7 @@ async function buscar() {
   try {
 
     var resposta =
-      await fetch(
+      await buscarComTimeout(
         '/api/pacientes?termo=' +
         encodeURIComponent(termo)
       );
@@ -829,10 +859,15 @@ async function buscar() {
 
   } catch (erro) {
 
+    var mensagem =
+      erro.name === 'AbortError'
+        ? 'A busca demorou mais que o esperado. Tente novamente.'
+        : erro.message;
+
     resultado.innerHTML =
       '<div class="message">' +
       'Erro: ' +
-      escapar(erro.message) +
+      escapar(mensagem) +
       '</div>';
 
   }
@@ -2206,3 +2241,4 @@ app.listen(
 
   }
 );
+
