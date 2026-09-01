@@ -14,57 +14,62 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 
-// ======================================================
-// POSTGRESQL
-// ======================================================
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-
   ssl: process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : false
 });
 
-// ======================================================
-// UPLOAD
-// ======================================================
-
 const upload = multer({
   storage: multer.memoryStorage(),
-
   limits: {
     fileSize: 10 * 1024 * 1024
   },
-
   fileFilter: function(req, file, cb) {
-
     if (!file.originalname.toLowerCase().endsWith('.txt')) {
-
-      return cb(
-        new Error('Apenas arquivos TXT são permitidos.')
-      );
-
+      return cb(new Error('Apenas arquivos TXT são permitidos.'));
     }
 
     cb(null, true);
-
   }
-
 });
-
-// ======================================================
-// MIDDLEWARE
-// ======================================================
 
 app.use(express.json());
 
-// ======================================================
-// PÁGINA PRINCIPAL
-// ======================================================
+function escapar(valor) {
+  if (valor === null || valor === undefined) {
+    return '';
+  }
+
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatarData(data) {
+  if (!data) {
+    return '-';
+  }
+
+  const texto = String(data);
+  const partes = texto.substring(0, 10).split('-');
+
+  if (partes.length !== 3) {
+    return texto;
+  }
+
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+/* ======================================================
+   PÁGINA PRINCIPAL
+====================================================== */
 
 app.get('/', function(req, res) {
-
   res.send(`
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -82,10 +87,6 @@ app.get('/', function(req, res) {
 
 <style>
 
-/* =====================================================
-   BASE
-===================================================== */
-
 * {
   box-sizing: border-box;
 }
@@ -94,20 +95,13 @@ body {
   margin: 0;
   background: #f3f5f8;
   color: #172033;
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 button,
 input {
   font-family: inherit;
 }
-
-/* =====================================================
-   TOPO
-===================================================== */
 
 .topbar {
   background: #ffffff;
@@ -154,27 +148,18 @@ input {
   font-size: 13px;
 }
 
-/* =====================================================
-   CONTAINER
-===================================================== */
-
 .container {
   max-width: 1120px;
   margin: 0 auto;
   padding: 36px 24px 60px;
 }
 
-/* =====================================================
-   BUSCA
-===================================================== */
-
 .search-card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 32px;
-  box-shadow:
-    0 8px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
 }
 
 .search-title {
@@ -205,8 +190,7 @@ input {
 
 .search-input:focus {
   border-color: #1769e0;
-  box-shadow:
-    0 0 0 3px rgba(23, 105, 224, 0.10);
+  box-shadow: 0 0 0 3px rgba(23, 105, 224, 0.10);
 }
 
 .primary-button {
@@ -223,10 +207,6 @@ input {
 .primary-button:hover {
   background: #1258bd;
 }
-
-/* =====================================================
-   RESULTADOS DA BUSCA
-===================================================== */
 
 .results {
   margin-top: 24px;
@@ -248,8 +228,7 @@ input {
 .patient-card:hover {
   transform: translateY(-1px);
   border-color: #1769e0;
-  box-shadow:
-    0 8px 24px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
 }
 
 .patient-name {
@@ -277,10 +256,6 @@ input {
   text-align: center;
   color: #64748b;
 }
-
-/* =====================================================
-   PEDIDO
-===================================================== */
 
 .order-header {
   margin-top: 24px;
@@ -328,10 +303,6 @@ input {
   font-weight: 700;
 }
 
-/* =====================================================
-   AÇÕES
-===================================================== */
-
 .actions {
   display: flex;
   gap: 10px;
@@ -367,10 +338,6 @@ input {
 .print-button:hover {
   background: #0f172a;
 }
-
-/* =====================================================
-   EXAMES
-===================================================== */
 
 .exam-list {
   display: flex;
@@ -480,10 +447,6 @@ input {
   font-weight: 700;
 }
 
-/* =====================================================
-   RODAPÉ
-===================================================== */
-
 .footer {
   max-width: 1120px;
   margin: 0 auto;
@@ -492,10 +455,6 @@ input {
   color: #94a3b8;
   font-size: 12px;
 }
-
-/* =====================================================
-   RESPONSIVO
-===================================================== */
 
 @media (max-width: 700px) {
 
@@ -543,41 +502,139 @@ input {
 
 }
 
-/* =====================================================
+/* ======================================================
    IMPRESSÃO
-===================================================== */
+   ====================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
 
 @media print {
 
+  html,
   body {
-    background: #ffffff;
-  }
-
-  .topbar {
-    border: 0;
-  }
-
-  .search-card {
-    display: none;
-  }
-
-  .actions {
-    display: none;
-  }
-
-  .container {
-    max-width: none;
+    background: #ffffff !important;
+    margin: 0;
     padding: 0;
   }
 
-  .order-header,
+  .topbar {
+    display: none !important;
+  }
+
+  /*
+   * IMPORTANTE:
+   * O resultado dos exames fica dentro de .search-card.
+   * Não escondemos mais .search-card.
+   * Escondemos somente os elementos de busca.
+   */
+
+  .search-card {
+    display: block !important;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  .search-title,
+  .search-description,
+  .search-row {
+    display: none !important;
+  }
+
+  .results {
+    display: block !important;
+    margin: 0 !important;
+  }
+
+  .container {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .actions {
+    display: none !important;
+  }
+
+  .order-header {
+    margin-top: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  .order-header-main {
+    padding: 0 0 12px !important;
+  }
+
+  .order-label {
+    color: #000000 !important;
+  }
+
+  .order-patient {
+    font-size: 22px !important;
+  }
+
+  .order-details {
+    gap: 20px;
+  }
+
+  .exam-list {
+    display: flex !important;
+    gap: 10px !important;
+  }
+
   .exam-card {
-    box-shadow: none;
-    break-inside: avoid;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .exam-header {
+    padding: 12px 14px 10px !important;
+  }
+
+  .exam-body {
+    padding: 12px 14px !important;
+  }
+
+  .result-box {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .item-table-wrapper {
+    overflow: visible !important;
+  }
+
+  .item-table {
+    width: 100% !important;
+  }
+
+  .item-table th,
+  .item-table td {
+    font-size: 10px !important;
+    padding: 6px !important;
+  }
+
+  .exam-info-text {
+    line-height: 1.35 !important;
   }
 
   .footer {
-    display: none;
+    display: none !important;
   }
 
 }
@@ -625,7 +682,7 @@ input {
     </h1>
 
     <p class="search-description">
-      Consulte pacientes e resultados de exames.
+      Digite o nome do paciente ou código.
     </p>
 
     <div class="search-row">
@@ -657,9 +714,7 @@ input {
 </main>
 
 <footer class="footer">
-
   Laboratório Maiolini e Miranda
-
 </footer>
 
 <script>
@@ -669,10 +724,6 @@ var campo =
 
 var resultado =
   document.getElementById('resultado');
-
-// ======================================================
-// ENTER
-// ======================================================
 
 campo.addEventListener(
   'keydown',
@@ -684,61 +735,6 @@ campo.addEventListener(
 
   }
 );
-
-// ======================================================
-// ESCAPAR HTML
-// ======================================================
-
-function escapar(valor) {
-
-  if (
-    valor === null ||
-    valor === undefined
-  ) {
-    return '';
-  }
-
-  return String(valor)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-
-}
-
-// ======================================================
-// DATA
-// ======================================================
-
-function formatarData(data) {
-
-  if (!data) {
-    return '-';
-  }
-
-  var texto = String(data);
-
-  var partes =
-    texto.substring(0, 10).split('-');
-
-  if (partes.length !== 3) {
-    return texto;
-  }
-
-  return (
-    partes[2] +
-    '/' +
-    partes[1] +
-    '/' +
-    partes[0]
-  );
-
-}
-
-// ======================================================
-// BUSCAR PACIENTES
-// ======================================================
 
 async function buscar() {
 
@@ -842,10 +838,6 @@ async function buscar() {
   }
 
 }
-
-// ======================================================
-// PEDIDOS DO PACIENTE
-// ======================================================
 
 async function abrirPaciente(pacienteId) {
 
@@ -978,10 +970,6 @@ async function abrirPaciente(pacienteId) {
 
 }
 
-// ======================================================
-// PEDIDO E EXAMES
-// ======================================================
-
 async function abrirPedido(pedidoId) {
 
   resultado.innerHTML =
@@ -1013,10 +1001,6 @@ async function abrirPedido(pedidoId) {
       dados.pedido;
 
     var html = '';
-
-    // --------------------------------------------------
-    // CABEÇALHO DO PEDIDO
-    // --------------------------------------------------
 
     html +=
       '<div class="order-header">' +
@@ -1063,10 +1047,6 @@ async function abrirPedido(pedidoId) {
 
       '</div>';
 
-    // --------------------------------------------------
-    // BOTÕES
-    // --------------------------------------------------
-
     html +=
       '<div class="actions">' +
 
@@ -1088,10 +1068,6 @@ async function abrirPedido(pedidoId) {
 
       '</div>';
 
-    // --------------------------------------------------
-    // LISTA DE EXAMES
-    // --------------------------------------------------
-
     html +=
       '<div class="exam-list">';
 
@@ -1112,10 +1088,6 @@ async function abrirPedido(pedidoId) {
 
           html +=
             '<article class="exam-card">';
-
-          // --------------------------------------------
-          // CABEÇALHO
-          // --------------------------------------------
 
           html +=
             '<div class="exam-header">' +
@@ -1161,16 +1133,8 @@ async function abrirPedido(pedidoId) {
           html +=
             '</div>';
 
-          // --------------------------------------------
-          // CORPO
-          // --------------------------------------------
-
           html +=
             '<div class="exam-body">';
-
-          // --------------------------------------------
-          // ITENS
-          // --------------------------------------------
 
           if (
             exame.itens &&
@@ -1237,13 +1201,7 @@ async function abrirPedido(pedidoId) {
 
           } else {
 
-            // ------------------------------------------
-            // RESULTADO SIMPLES
-            // ------------------------------------------
-
-            if (
-              exame.resultado_texto
-            ) {
+            if (exame.resultado_texto) {
 
               html +=
                 '<div class="result-box">' +
@@ -1253,28 +1211,25 @@ async function abrirPedido(pedidoId) {
                 '</span>' +
 
                 '<div class="result-value">' +
+
                 escapar(
                   exame.resultado_texto
                 ) +
+
                 (
                   exame.unidade
                     ? ' ' +
                       escapar(exame.unidade)
                     : ''
                 ) +
+
                 '</div>' +
 
                 '</div>';
 
             }
 
-            // ------------------------------------------
-            // REFERÊNCIA
-            // ------------------------------------------
-
-            if (
-              exame.referencia_texto
-            ) {
+            if (exame.referencia_texto) {
 
               html +=
                 '<div class="exam-info">' +
@@ -1284,9 +1239,11 @@ async function abrirPedido(pedidoId) {
                 '</span>' +
 
                 '<div class="exam-info-text">' +
+
                 escapar(
                   exame.referencia_texto
                 ) +
+
                 '</div>' +
 
                 '</div>';
@@ -1294,10 +1251,6 @@ async function abrirPedido(pedidoId) {
             }
 
           }
-
-          // --------------------------------------------
-          // OBSERVAÇÕES
-          // --------------------------------------------
 
           if (exame.observacoes) {
 
@@ -1309,9 +1262,11 @@ async function abrirPedido(pedidoId) {
               '</span>' +
 
               '<div class="exam-info-text">' +
+
               escapar(
                 exame.observacoes
               ) +
+
               '</div>' +
 
               '</div>';
@@ -1350,10 +1305,6 @@ async function abrirPedido(pedidoId) {
 
 }
 
-// ======================================================
-// VOLTAR
-// ======================================================
-
 function voltarBusca() {
 
   resultado.innerHTML = '';
@@ -1362,35 +1313,27 @@ function voltarBusca() {
 
 }
 
-// ======================================================
-// FIM
-// ======================================================
-
 </script>
 
 </body>
-
 </html>
   `);
-
 });
 
-// ======================================================
-// TESTE DO BANCO
-// ======================================================
+/* ======================================================
+   TESTE DO BANCO
+====================================================== */
 
 app.get('/db', async function(req, res) {
 
   try {
 
     const result =
-      await pool.query(
-        `
+      await pool.query(`
         SELECT
           NOW() AS horario,
           current_database() AS banco
-        `
-      );
+      `);
 
     res.json({
 
@@ -1430,9 +1373,9 @@ app.get('/db', async function(req, res) {
 
 });
 
-// ======================================================
-// BUSCAR PACIENTES
-// ======================================================
+/* ======================================================
+   BUSCAR PACIENTES
+====================================================== */
 
 app.get(
   '/api/pacientes',
@@ -1493,9 +1436,9 @@ app.get(
   }
 );
 
-// ======================================================
-// PEDIDOS DO PACIENTE
-// ======================================================
+/* ======================================================
+   PEDIDOS DO PACIENTE
+====================================================== */
 
 app.get(
   '/api/pacientes/:id/pedidos',
@@ -1558,9 +1501,9 @@ app.get(
   }
 );
 
-// ======================================================
-// PEDIDO COMPLETO
-// ======================================================
+/* ======================================================
+   PEDIDO COMPLETO
+====================================================== */
 
 app.get(
   '/api/pedidos/:id',
@@ -1634,15 +1577,16 @@ app.get(
   }
 );
 
-// ======================================================
-// PÁGINA DE IMPORTAÇÃO
-// ======================================================
+/* ======================================================
+   PÁGINA DE IMPORTAÇÃO
+====================================================== */
 
 app.get(
   '/importar',
   function(req, res) {
 
     res.send(`
+
 <!DOCTYPE html>
 
 <html lang="pt-BR">
@@ -1780,7 +1724,9 @@ formulario.addEventListener(
     event.preventDefault();
 
     var arquivo =
-      document.getElementById('arquivo').files[0];
+      document
+        .getElementById('arquivo')
+        .files[0];
 
     if (!arquivo) {
       return;
@@ -1837,14 +1783,15 @@ formulario.addEventListener(
 </body>
 
 </html>
+
     `);
 
   }
 );
 
-// ======================================================
-// IMPORTAR TXT
-// ======================================================
+/* ======================================================
+   IMPORTAR TXT
+====================================================== */
 
 app.post(
   '/importar',
@@ -2016,7 +1963,9 @@ app.post(
         if (
           pedidoExistente.rows.length > 0
         ) {
+
           continue;
+
         }
 
         for (
@@ -2194,9 +2143,9 @@ app.post(
   }
 );
 
-// ======================================================
-// ERROS DO UPLOAD
-// ======================================================
+/* ======================================================
+   ERROS DO UPLOAD
+====================================================== */
 
 app.use(
   function(error, req, res, next) {
@@ -2241,9 +2190,9 @@ app.use(
   }
 );
 
-// ======================================================
-// SERVIDOR
-// ======================================================
+/* ======================================================
+   SERVIDOR
+====================================================== */
 
 app.listen(
   PORT,
